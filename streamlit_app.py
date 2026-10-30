@@ -1,14 +1,24 @@
 import datetime
 import random
-
 import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from db import buscar_tickets
+from db import listar_tickets
+from db import crear_ticket
+from db import init_db
+from db import crear_prestadores_iniciales
+from db import obtener_prestadores
+
+init_db()
+crear_prestadores_iniciales()
+prestadores = obtener_prestadores()
+
 # Show app title and description.
-st.set_page_config(page_title="Support tickets", page_icon="🎫")
-st.title("🎫 Support tickets")
+st.set_page_config(page_title="CND ", page_icon="🎫")
+st.title("🎫 CMC Gestión de Traslados")
 st.write(
     """
     This app shows how you can build an internal tool in Streamlit. Here, we are 
@@ -60,113 +70,100 @@ if "df" not in st.session_state:
     }
     df = pd.DataFrame(data)
 
-    # Save the dataframe in session state (a dictionary-like object that persists across
-    # page runs). This ensures our data is persisted when the app updates.
-    st.session_state.df = df
 
 
 # Show a section to add a new ticket.
-st.header("Add a ticket")
+st.header("Crear Caso")
 
 # We're adding tickets via an `st.form` and some input widgets. If widgets are used
 # in a form, the app will only rerun once the submit button is pressed.
 with st.form("add_ticket_form"):
-    issue = st.text_area("Describe the issue")
-    priority = st.selectbox("Priority", ["High", "Medium", "Low"])
-    submitted = st.form_submit_button("Submit")
 
-if submitted:
-    # Make a dataframe for the new ticket and append it to the dataframe in session
-    # state.
-    recent_ticket_number = int(max(st.session_state.df.ID).split("-")[1])
-    today = datetime.datetime.now().strftime("%m-%d-%Y")
-    df_new = pd.DataFrame(
+    beneficio = st.text_input("Beneficio")
+
+    nombre = st.text_input("Nombre")
+
+    apellido = st.text_input("Apellido")
+
+    telefono = st.text_input("Telefono")
+
+    prestador = st.selectbox(
+        "Prestador",
+        [p["nombre"] for p in prestadores]
+    )
+
+    tipo = st.selectbox(
+        "Tipo de gestion",
         [
-            {
-                "ID": f"TICKET-{recent_ticket_number+1}",
-                "Issue": issue,
-                "Status": "Open",
-                "Priority": priority,
-                "Date Submitted": today,
-            }
+            "Demora",
+            "Consulta",
+            "Reclamo",
+            "Movil no asignado",
+            "Ausencia de movil"
         ]
     )
 
-    # Show a little success message.
-    st.write("Ticket submitted! Here are the ticket details:")
-    st.dataframe(df_new, use_container_width=True, hide_index=True)
-    st.session_state.df = pd.concat([df_new, st.session_state.df], axis=0)
+    observacion = st.text_area("Observaciones")
 
-# Show section to view and edit existing tickets in a table.
-st.header("Existing tickets")
-st.write(f"Number of tickets: `{len(st.session_state.df)}`")
-
-st.info(
-    "You can edit the tickets by double clicking on a cell. Note how the plots below "
-    "update automatically! You can also sort the table by clicking on the column headers.",
-    icon="✍️",
-)
-
-# Show the tickets dataframe with `st.data_editor`. This lets the user edit the table
-# cells. The edited data is returned as a new dataframe.
-edited_df = st.data_editor(
-    st.session_state.df,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Status": st.column_config.SelectboxColumn(
-            "Status",
-            help="Ticket status",
-            options=["Open", "In Progress", "Closed"],
-            required=True,
-        ),
-        "Priority": st.column_config.SelectboxColumn(
-            "Priority",
-            help="Priority",
-            options=["High", "Medium", "Low"],
-            required=True,
-        ),
-    },
-    # Disable editing the ID and Date Submitted columns.
-    disabled=["ID", "Date Submitted"],
-)
-
-# Show some metrics and charts about the ticket.
-st.header("Statistics")
-
-# Show metrics side by side using `st.columns` and `st.metric`.
-col1, col2, col3 = st.columns(3)
-num_open_tickets = len(st.session_state.df[st.session_state.df.Status == "Open"])
-col1.metric(label="Number of open tickets", value=num_open_tickets, delta=10)
-col2.metric(label="First response time (hours)", value=5.2, delta=-1.5)
-col3.metric(label="Average resolution time (hours)", value=16, delta=2)
-
-# Show two Altair charts using `st.altair_chart`.
-st.write("")
-st.write("##### Ticket status per month")
-status_plot = (
-    alt.Chart(edited_df)
-    .mark_bar()
-    .encode(
-        x="month(Date Submitted):O",
-        y="count():Q",
-        xOffset="Status:N",
-        color="Status:N",
+    prioridad = st.selectbox(
+        "Prioridad",
+        ["Alta", "Media", "Baja"]
     )
-    .configure_legend(
-        orient="bottom", titleFontSize=14, labelFontSize=14, titlePadding=5
-    )
-)
-st.altair_chart(status_plot, use_container_width=True, theme="streamlit")
 
-st.write("##### Current ticket priorities")
-priority_plot = (
-    alt.Chart(edited_df)
-    .mark_arc()
-    .encode(theta="count():Q", color="Priority:N")
-    .properties(height=300)
-    .configure_legend(
-        orient="bottom", titleFontSize=14, labelFontSize=14, titlePadding=5
+    submitted = st.form_submit_button("Crear Caso")
+if submitted:
+
+    numero_ticket = crear_ticket(
+        beneficio,
+        nombre,
+        apellido,
+        telefono,
+        1,
+        tipo,
+        prioridad,
+        observacion
     )
+
+    st.success(
+        f"Ticket {numero_ticket} creado correctamente"
+    )
+
+    st.write("### Datos cargados")
+
+    st.write(f"**Beneficio:** {beneficio}")
+    st.write(f"**Nombre:** {nombre}")
+    st.write(f"**Apellido:** {apellido}")
+    st.write(f"**Prestador:** {prestador}")
+    st.write(f"**Tipo:** {tipo}")
+    st.write(f"**Prioridad:** {prioridad}")
+    st.write(f"**Observación:** {observacion}")
+    st.divider()
+
+    st.subheader("Gestionar Caso")
+
+buscar = st.text_input(
+    "Ingrese Beneficio o Apellido"
 )
-st.altair_chart(priority_plot, use_container_width=True, theme="streamlit")
+
+if buscar:
+
+    tickets = buscar_tickets(buscar)
+
+else:
+
+    tickets = listar_tickets()
+
+st.divider()
+
+st.subheader("Resultados")
+st.write("DEBUG")
+st.write(f"Total encontrados: {len(tickets)}")
+
+for ticket in tickets:
+
+    st.write(
+        f"{ticket['nombre_afiliado']} "
+        f"{ticket['apellido_afiliado']} | "
+        f"{ticket['beneficio']} | "
+        f"{ticket['numero_ticket']}"
+    )
